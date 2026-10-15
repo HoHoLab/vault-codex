@@ -15,5 +15,7 @@ readline.createInterface({input: process.stdin}).on('line', line => {
   }
   if (message.id === 'approval-1' && message.result) send({method: 'approval/resolved', params: message.result});
   if (message.method === 'crash') process.exit(3);
+  if (message.method === 'invalid-shape') process.stdout.write('null\n');
+  if (message.method === 'unknown-event') {send({method: 'future/notification', params: null}); send({id: message.id, result: true});}
   if (message.method === 'invalid') process.stdout.write('not JSON\n');
 });

@@ -1,3 +1,5 @@
+import {setTimeout, clearTimeout} from 'node:timers';
+import {eventParams, type AccountResponse, type LoginResponse, type ThreadResponse, type TurnResponse, type UserInput} from './protocol';
 import {randomUUID} from 'node:crypto';
 import {CodexRpc, findCodex, type RpcEvent} from './rpc';
 import {errorText, permissions, fastTier, type Attachment, type Message, type ModelInfo, type SavedData, type Session, type TurnStatus} from './types';
@@ -28,7 +30,7 @@ export class Controller {
   private disposed = false;
   private pendingTurnId = '';
   private appliedPreferences?: string;
-  constructor(public data: SavedData, public cwd: string, private persist: () => Promise<void>, rpc?: CodexRpc, readonly i18n = new I18n()) {
+  constructor(public data: SavedData, public cwd: string, private persist: () => Promise<void>, rpc?: CodexRpc, readonly i18n = new I18n(), private readonly configDir?: string) {
     this.rpc = rpc ?? new CodexRpc(i18n.t);
     for (const session of data.sessions) {
       // Versions 0.1.6–0.1.7 could bind a pending request to a replayed usage
@@ -91,7 +93,7 @@ export class Controller {
       if (this.disposed) return;
       await this.rpc.connect(command, this.cwd);
       const [account, models] = await Promise.all([
-        this.rpc.request('account/read', {refreshToken: false}), this.listModels()
+        this.rpc.request<AccountResponse>('account/read', {refreshToken: false}), this.listModels()
       ]);
       this.models = models;
       this.account = account.account?.type === 'chatgpt' ? 'ChatGPT 账户' : account.account?.type === 'apiKey' ? 'API Key' : account.requiresOpenaiAuth === false ? '已配置服务' : '';
@@ -119,9 +121,9 @@ export class Controller {
   }
   async login() {
     await this.connect();
-    const result = await this.rpc.request('account/login/start', {type: 'chatgpt'});
+    const result = await this.rpc.request<LoginResponse>('account/login/start', {type: 'chatgpt'});
     if (!result.authUrl) throw new Error(this.t('Codex 没有返回登录地址。'));
-    return result.authUrl as string;
+    return result.authUrl;
   }
   async reconnect() {
     if (this.busy) throw new Error(this.t('请先停止当前回复。'));
@@ -136,7 +138,7 @@ export class Controller {
     let sent = false;
     try {
       // Capture once: edits in Settings while a turn starts apply to the next turn.
-      const preferences = assistantPreferences(this.data.settings);
+      const preferences = assistantPreferences(this.data.settings, this.configDir);
       const signature = JSON.stringify(preferences);
       // A fresh runtime ensures changed/cleared thread config and developer
       // instructions are applied on resume; rejoining a loaded thread can ignore them.
@@ -150,14 +152,14 @@ export class Controller {
       const config = {model: settings.model || undefined, serviceTier: serviceTier === 'default' ? null : serviceTier, cwd: this.cwd, approvalPolicy: policy.approvalPolicy, sandbox: policy.sandbox, approvalsReviewer: policy.approvalsReviewer, ...preferences};
       const firstMessage = !session.messages.some(message => message.role === 'user');
       if (session.id.startsWith('draft-')) {
-        const response = await this.rpc.request('thread/start', config);
+        const response = await this.rpc.request<ThreadResponse>('thread/start', config);
         session.id = response.thread.id; this.data.activeId = session.id; this.resumed.add(session.id);
       } else if (!this.resumed.has(session.id)) {
         await this.rpc.request('thread/resume', {threadId: session.id, excludeTurns: true, ...config}); this.resumed.add(session.id);
       }
       this.appliedPreferences = signature;
       const references = attachments.filter(item => !item.image).map(item => `\n\n<reference name=${JSON.stringify(item.name)}>\n${item.text ?? `File in vault: ${item.path}`}\n</reference>`).join('');
-      const input: any[] = [{type: 'text', text: (text.trim() || this.t('请查看附件。')) + references}];
+      const input: UserInput[] = [{type: 'text', text: (text.trim() || this.t('请查看附件。')) + references}];
       for (const attachment of attachments) if (attachment.image && attachment.path) input.push({type: 'localImage', path: attachment.path});
       this.pendingTurnId = `pending-${randomUUID()}`;
       (session.turns ??= []).push({id: this.pendingTurnId, status: 'inProgress', startedAt});
@@ -166,7 +168,7 @@ export class Controller {
       if (firstMessage) session.title = (text.trim() || attachments[0]?.name || this.t('新对话')).slice(0, 36);
       this.status = 'Codex 正在工作…'; this.changed(true);
       try {
-        const result = await this.rpc.request('turn/start', {threadId: session.id, input, model: settings.model || undefined, serviceTier: serviceTier === 'default' ? null : serviceTier, serviceTierForTurn: serviceTier, effort: settings.effort || undefined, cwd: this.cwd, approvalPolicy: policy.approvalPolicy, approvalsReviewer: policy.approvalsReviewer, sandboxPolicy: policy.sandboxPolicy});
+        const result = await this.rpc.request<TurnResponse>('turn/start', {threadId: session.id, input, model: settings.model || undefined, serviceTier: serviceTier === 'default' ? null : serviceTier, serviceTierForTurn: serviceTier, effort: settings.effort || undefined, cwd: this.cwd, approvalPolicy: policy.approvalPolicy, approvalsReviewer: policy.approvalsReviewer, sandboxPolicy: policy.sandboxPolicy});
         sent = true;
         this.bindTurn(result.turn.id);
         if (!this.completed.has(result.turn.id)) this.turnId = result.turn.id;
@@ -218,14 +220,14 @@ export class Controller {
     if (this.pendingTurnId === id) this.pendingTurnId = '';
   }
   private onEvent(event: RpcEvent) {
-    const p = event.params ?? {};
+    const p = eventParams(event.params);
     if (event.method === 'connection/closed') {
       const active = this.turnId || this.pendingTurnId;
       if (active) this.finishTurn(active, this.turnId ? 'failed' : 'unconfirmed', p.message);
-      this.busy = false; this.turnId = ''; this.approvals = []; this.resumed.clear(); this.appliedPreferences = undefined; this.status = this.lastError = p.message; this.changed(true); return;
+      this.busy = false; this.turnId = ''; this.approvals = []; this.resumed.clear(); this.appliedPreferences = undefined; this.status = this.lastError = p.message ?? this.t('Codex 连接已关闭。'); this.changed(true); return;
     }
     if (event.method === 'account/login/completed') {
-      this.status = p.success ? '登录成功' : (p.error ?? '登录失败');
+      this.status = p.success ? '登录成功' : (typeof p.error === 'string' ? p.error : p.error?.message ?? '登录失败');
       if (p.success) { this.account = 'ChatGPT 账户'; void this.listModels().then(models => {this.models = models; const model = this.model ?? models.find(item => item.isDefault) ?? models[0]; if (model) this.chooseModel(model.model); this.changed(true);}).catch(error => {this.status = errorText(error); this.changed();}); }
       this.changed(); return;
     }
@@ -247,37 +249,37 @@ export class Controller {
       const completed = event.method.endsWith('/completed');
       const labels: Record<string, string> = {approved: '已允许', denied: '已拒绝', timedOut: '超时', aborted: '已中止'};
       const reviewStatus = p.review?.status;
-      this.upsert({id: `review-${p.reviewId}`, role: 'tool', turnId, toolKind: 'review', title: completed ? this.t('自动审批：{status}', {status: this.t(labels[reviewStatus] ?? '已结束')}) : this.t('Codex 正在审批'), text: p.review?.rationale ?? '', status: completed ? reviewStatus === 'approved' ? 'completed' : 'failed' : 'inProgress'});
+      this.upsert({id: `review-${p.reviewId}`, role: 'tool', turnId, toolKind: 'review', title: completed ? this.t('自动审批：{status}', {status: this.t(labels[reviewStatus ?? ''] ?? '已结束')}) : this.t('Codex 正在审批'), text: p.review?.rationale ?? '', status: completed ? reviewStatus === 'approved' ? 'completed' : 'failed' : 'inProgress'});
     }
-    if (event.method === 'turn/started') {this.bindTurn(p.turn.id); this.turnId = p.turn.id; this.busy = true;}
+    if (event.method === 'turn/started' && p.turn) {this.bindTurn(p.turn.id); this.turnId = p.turn.id; this.busy = true;}
     if (event.method === 'turn/plan/updated') {
-      const plan = (p.plan ?? []).map((step: any) => `- [${step.status === 'completed' ? 'x' : ' '}] ${step.step}${step.status === 'inProgress' ? this.t('（进行中）') : ''}`).join('\n');
+      const plan = (p.plan ?? []).map((step) => `- [${step.status === 'completed' ? 'x' : ' '}] ${step.step}${step.status === 'inProgress' ? this.t('（进行中）') : ''}`).join('\n');
       this.upsert({id: `plan-${turnId}`, role: 'assistant', phase: 'plan', title: this.t('计划'), turnId, status: 'inProgress', text: [p.explanation, plan].filter(Boolean).join('\n\n')});
     }
-    if (event.method === 'item/agentMessage/delta' || event.method === 'item/plan/delta') {
+    if ((event.method === 'item/agentMessage/delta' || event.method === 'item/plan/delta') && p.itemId && typeof p.delta === 'string') {
       const message = this.session?.messages.find(item => item.id === p.itemId);
       if (message) message.text += p.delta;
       else this.upsert({id: p.itemId, role: 'assistant', turnId, phase: event.method === 'item/plan/delta' ? 'plan' : undefined, status: 'inProgress', text: p.delta});
     }
-    if (event.method === 'item/started' || event.method === 'item/completed') {
+    if ((event.method === 'item/started' || event.method === 'item/completed') && p.item) {
       const item = p.item;
       const status = item.status ?? (event.method === 'item/completed' ? 'completed' : 'inProgress');
-      if (item.type === 'agentMessage' || item.type === 'plan') this.upsert({id: item.id, role: 'assistant', turnId, phase: item.type === 'plan' ? 'plan' : ['commentary', 'partial_answer', 'final_answer'].includes(item.phase) ? item.phase : undefined, text: item.text ?? '', status});
+      if (item.type === 'agentMessage' || item.type === 'plan') this.upsert({id: item.id, role: 'assistant', turnId, phase: item.type === 'plan' ? 'plan' : (item.phase === 'commentary' || item.phase === 'partial_answer' || item.phase === 'final_answer') ? item.phase : undefined, text: item.text ?? '', status});
       else if (item.type === 'commandExecution') this.upsert({id: item.id, role: 'tool', turnId, toolKind: 'command', title: item.command, text: item.aggregatedOutput ?? '', status});
-      else if (item.type === 'fileChange') this.upsert({id: item.id, role: 'tool', turnId, toolKind: 'file', title: this.t('文件修改'), text: (item.changes ?? []).map((change: any) => `${change.path}\n${change.diff ?? ''}`).join('\n\n'), status});
+      else if (item.type === 'fileChange') this.upsert({id: item.id, role: 'tool', turnId, toolKind: 'file', title: this.t('文件修改'), text: (item.changes ?? []).map((change) => `${change.path}\n${change.diff ?? ''}`).join('\n\n'), status});
       else if (item.type === 'mcpToolCall') this.upsert({id: item.id, role: 'tool', turnId, toolKind: 'mcp', title: `${item.server} / ${item.tool}`, text: item.error ? JSON.stringify(item.error) : item.result ? JSON.stringify(item.result, null, 2) : '', status});
       else if (item.type === 'webSearch') this.upsert({id: item.id, role: 'tool', turnId, toolKind: 'search', title: this.t('搜索网页'), text: item.query ?? item.action?.query ?? '', status});
     }
     if (event.method === 'item/commandExecution/outputDelta') {
-      const message = this.session?.messages.find(item => item.id === p.itemId); if (message) message.text = (message.text + p.delta).slice(-100000);
+      const message = this.session?.messages.find(item => item.id === p.itemId); if (message) message.text = (message.text + (p.delta ?? '')).slice(-100000);
     }
-    if (event.method === 'turn/completed') {
+    if (event.method === 'turn/completed' && p.turn) {
       this.bindTurn(p.turn.id); this.finishTurn(p.turn.id, p.turn.status, p.turn.error?.message);
       this.completed.add(p.turn.id); this.busy = false; this.turnId = ''; this.approvals = [];
       this.status = p.turn.status === 'completed' ? '已连接' : p.turn.status === 'interrupted' ? '已停止' : this.t('回复失败：{error}', {error: p.turn.error?.message ?? this.t('未知错误')});
       if (p.turn.status === 'failed') {this.lastError = this.status; this.upsert({id: `error-${p.turn.id}`, role: 'system', turnId: p.turn.id, text: this.status});}
     }
-    if (event.method === 'error' && !p.willRetry) this.status = this.lastError = p.error?.message ?? 'Codex 发生错误';
+    if (event.method === 'error' && !p.willRetry) this.status = this.lastError = (typeof p.error === 'string' ? p.error : p.error?.message) ?? 'Codex 发生错误';
     this.changed(true);
   }
   async dispose() { this.disposed = true; clearTimeout(this.saveTimer); this.rpc.close(); this.listeners.clear(); await this.persist(); }

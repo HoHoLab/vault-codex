@@ -19,7 +19,7 @@
 
 ### 社区插件库
 
-插件在 Obsidian Community 发布后，可在「设置 → 第三方插件 → 浏览」搜索 **Vault Codex** 并安装、启用。在正式发布前，请使用手动安装。
+在「设置 → 第三方插件 → 浏览」搜索 **Vault Codex** 并安装、启用，也可以直接打开[社区插件页面](https://community.obsidian.md/plugins/vault-codex)。
 
 ### 手动安装
 

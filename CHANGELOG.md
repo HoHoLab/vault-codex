@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.12 — 2026-10-15
+
+- Type the consumed Codex protocol fields, account responses, saved-data boundary, and transcription claims; handle invalid JSON message envelopes without leaving requests pending.
+- Bind view and microphone timers to their owning window; use explicit Node timers for process-level requests, persistence, and serialized rendering.
+- Preserve approval decisions, secret question inputs, Markdown replacement, accessible labels, and cancellation behavior with additional regression coverage.
+- Include the actual vault configuration directory in assistant instructions instead of assuming the default folder.
+- Replace static CSS overrides, relational selectors, and clipping with scoped styles while preserving hidden controls, focus indication, and reduced motion.
+- Add GitHub build provenance attestations for the three plugin assets and link the published community listing in both READMEs.
+
 ## 0.1.11 — 2026-10-15
 
 - Move the chat input's automatic height and the permission menu's fixed alignment into CSS classes to resolve the community scanner's blocking style rule while preserving dynamic sizing and positioning.

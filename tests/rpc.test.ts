@@ -40,3 +40,13 @@ test('invalid protocol fails pending requests instead of silently hanging', asyn
   try {await assert.rejects(rpc.request('invalid', {}), /无效的协议/); assert.equal(rpc.ready, false);}
   finally {rpc.close();}
 });
+test('non-object protocol messages fail cleanly; unknown notification envelopes remain compatible', async () => {
+  const rpc = await connect(); const events: string[] = [];
+  rpc.onEvent(event => events.push(event.method));
+  try {
+    assert.equal(await rpc.request('unknown-event', {}), true);
+    assert.ok(events.includes('future/notification'));
+    await assert.rejects(rpc.request('invalid-shape', {}), /无效的协议/);
+    assert.equal(rpc.ready, false);
+  } finally {rpc.close();}
+});

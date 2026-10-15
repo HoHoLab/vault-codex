@@ -28,10 +28,12 @@ async function environment() {
   };
   element.createDiv = function (options: any = {}) {return this.createEl('div', options);};
   element.createSpan = function (options: any = {}) {return this.createEl('span', options);};
+  (win as any).createSpan = () => document.createElement('span');
+  (win as any).createDiv = () => document.createElement('div');
   const leaves = new Set<any>(), saved: any[] = [], commands: any[] = [];
   class Component {addChild(child: any) {return child;} removeChild() {} registerDomEvent(el: any, name: string, listener: any) {el.addEventListener(name, listener);}}
   class FileSystemAdapter {getBasePath() {return '/isolated-test-vault';}}
-  const app: any = {vault: {adapter: new FileSystemAdapter(), getFiles: () => []}, workspace: {
+  const app: any = {vault: {configDir: '.custom-config', adapter: new FileSystemAdapter(), getFiles: () => []}, workspace: {
     factory: null,
     getLeavesOfType: () => [...leaves].filter(leaf => leaf.view),
     getRightLeaf: () => leaf('right-sidebar'), getLeftLeaf: () => leaf('left-sidebar'), getLeaf: () => leaf('main-tab'),
@@ -205,5 +207,45 @@ test('the production message view honors the auto-scroll toggle and pauses while
     toggle.checked = true; toggle.dispatchEvent(new env.win.Event('change'));
     messages.scrollTop = 900; env.plugin.controller.changed(); await tick(); assert.equal(messages.scrollTop, 1400);
     messages.scrollTop = 100; env.plugin.controller.changed(); await tick(); assert.equal(messages.scrollTop, 100);
+  } finally {await env.close();}
+});
+
+test('accessible input labels stay outside inputs and Markdown replacement renders in the owning document', async () => {
+  const env = await environment();
+  try {
+    const input = env.document.querySelector('.codex-input')!;
+    const name = env.document.getElementById(input.getAttribute('aria-labelledby')!);
+    assert.equal(name?.parentElement, input.parentElement);
+    assert.equal(name?.textContent, '消息输入框');
+    const reply = env.document.querySelector('.codex-message-assistant .codex-message-body')!;
+    assert.equal(reply.querySelector('p')?.textContent, '原始回答');
+    env.plugin.controller.session.messages[1].text = '更新后的回答';
+    env.plugin.controller.changed(); await tick(); await tick();
+    assert.equal(reply.querySelector('p')?.textContent, '更新后的回答');
+    assert.equal(reply.children.length, 1);
+    assert.equal(reply.ownerDocument, env.document);
+  } finally {await env.close();}
+});
+
+test('approval cards preserve question choices, secret answers, and explicit permission decisions', async () => {
+  const env = await environment();
+  try {
+    const c = env.plugin.controller; const responses: any[] = [];
+    c.rpc.respond = (id: string, result: unknown) => responses.push({id, result});
+    c.approvals = [{id: 'question', method: 'item/tool/requestUserInput', params: {questions: [{id: 'answer', question: 'Choose', options: [{label: 'Option A', description: 'First'}]}, {id: 'secret', question: 'Private', isSecret: true}]}}];
+    c.changed(); await tick();
+    const card = env.document.querySelector('.codex-approval')!;
+    const select = card.querySelector('select')!; select.value = 'Option A';
+    const secret = card.querySelector('input[type=password]')!; (secret as any).value = 'my answer';
+    (card.querySelector('button') as any).click();
+    assert.deepEqual(responses[0], {id:'question', result:{answers:{answer:{answers:['Option A']}, secret:{answers:['my answer']}}}});
+    c.approvals = [{id: 'permission', method: 'item/permissions/requestApproval', params: {permissions: {network: {enabled:true}}}}];
+    c.changed(); await tick();
+    const buttons = env.document.querySelectorAll('.codex-approval-buttons button');
+    (buttons[0] as any).click();
+    assert.deepEqual(responses[1], {id:'permission', result:{permissions:{}, scope:'turn'}});
+    c.approvals = [{id:'command',method:'item/commandExecution/requestApproval',params:{command:'echo test',availableDecisions:['decline']}}];
+    c.changed(); await tick();
+    assert.equal((env.document.querySelector('.codex-approval-buttons .mod-cta') as any).disabled, true);
   } finally {await env.close();}
 });

@@ -1,3 +1,6 @@
+import {setTimeout, clearTimeout} from 'node:timers';
+
+// Render scheduling is process-local; dispose cancels it when the owning view closes.
 interface RenderRequest {text: string; streaming: boolean; key: string;}
 
 // Serialize async Markdown renders and coalesce token bursts. The visible body

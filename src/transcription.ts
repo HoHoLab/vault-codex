@@ -1,11 +1,13 @@
 import {defaultTranslate, type Translate} from './i18n';
+import {setTimeout, clearTimeout} from 'node:timers';
+import {isRecord} from './protocol';
 import {randomUUID} from 'node:crypto';
 import {PLUGIN_VERSION} from './plugin-info';
 
 const TRANSCRIBE_URL = 'https://chatgpt.com/backend-api/transcribe';
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 interface AuthStatus {authMethod: string | null; authToken: string | null;}
-export interface VoiceRpc {request<T = any>(method: string, params: unknown): Promise<T>;}
+export interface VoiceRpc {request<T = unknown>(method: string, params: unknown): Promise<T>;}
 export interface VoiceRequest {url: string; method: string; headers: Record<string, string>; body: ArrayBuffer; throw: boolean;}
 export interface VoiceResponse {status: number; text: string;}
 export type VoiceTransport = (request: VoiceRequest) => Promise<VoiceResponse>;
@@ -15,10 +17,14 @@ export class TranscriptionError extends Error {
 }
 
 function abortError() {return new DOMException(defaultTranslate('已取消语音输入。'), 'AbortError');}
+function cancellationError(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason;
+  return reason instanceof Error ? reason : abortError();
+}
 function waitWithSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(signal.reason ?? abortError());
+  if (signal.aborted) return Promise.reject(cancellationError(signal));
   return new Promise((resolve, reject) => {
-    const abort = () => reject(signal.reason ?? abortError());
+    const abort = () => reject(cancellationError(signal));
     signal.addEventListener('abort', abort, {once: true});
     promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
   });
@@ -26,8 +32,9 @@ function waitWithSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T>
 
 function accountId(token: string): string | undefined {
   try {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const id = claims['https://api.openai.com/auth']?.chatgpt_account_id;
+    const claims: unknown = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    const auth = isRecord(claims) ? claims['https://api.openai.com/auth'] : undefined;
+    const id = isRecord(auth) ? auth.chatgpt_account_id : undefined;
     return typeof id === 'string' && id.length < 512 ? id : undefined;
   } catch {return undefined;}
 }
@@ -50,7 +57,7 @@ export class CodexTranscriber {
         Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="dictation.${extensions[type]}"\r\nContent-Type: ${type}\r\n\r\n`),
         Buffer.from(audio), Buffer.from(`\r\n--${boundary}--\r\n`)
       ]);
-      const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       for (let attempt = 0; attempt < 2; attempt++) {
         const auth = await waitWithSignal(this.rpc.request<AuthStatus>('getAuthStatus', {includeToken: true, refreshToken: attempt > 0}), signal);
         if (auth.authMethod !== 'chatgpt' || !auth.authToken) throw new TranscriptionError(this.t('语音输入需要本机 Codex 登录 ChatGPT；API Key 登录不能复用这项听写服务。'));
@@ -77,7 +84,7 @@ export class CodexTranscriber {
       }
       throw new TranscriptionError(this.t('Codex 登录已失效，请重新登录 ChatGPT。'));
     } catch (error) {
-      if (signal.aborted) throw signal.reason ?? abortError();
+      if (signal.aborted) throw cancellationError(signal);
       if (error instanceof TranscriptionError) throw error;
       // Transport errors may contain headers or server diagnostics.
       throw new TranscriptionError(this.t('无法连接语音转写服务，请检查网络和 Codex 登录状态。'));

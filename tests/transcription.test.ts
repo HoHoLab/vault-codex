@@ -62,3 +62,10 @@ test('invalid recordings are rejected before authentication or upload', async ()
   await assert.rejects(client.transcribe(new ArrayBuffer(1), 'text/plain'), /格式/);
   assert.equal(calls.length, 0);
 });
+
+test('a non-Error cancellation reason is reported as cancellation without leaking the reason', async () => {
+  const cancel = new AbortController(); cancel.abort('private cancellation detail');
+  const {client, calls} = setup(async () => {throw new Error('must not upload');});
+  await assert.rejects(client.transcribe(new ArrayBuffer(1), 'audio/wav', cancel.signal), error => error instanceof Error && error.name === 'AbortError' && !error.message.includes('private'));
+  assert.equal(calls.length, 0);
+});

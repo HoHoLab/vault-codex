@@ -4,6 +4,7 @@ import {join} from 'node:path';
 import type CodexPlugin from './main';
 import type {Controller} from './controller';
 import {ACCESS_DESCRIPTIONS, ACCESS_ICONS, ACCESS_LABELS, EFFORT_LABELS, contextUsage, formatTokens, fastTier, errorText, type Attachment, type Message, type Session} from './types';
+import {eventParams} from './protocol';
 import type {RpcEvent} from './rpc';
 import {InfoModal, VoiceHelpModal} from './info';
 import {PLUGIN_NAME} from './plugin-info';
@@ -27,7 +28,7 @@ export function setAccessibleName(element: HTMLElement, label: string) {
   element.removeAttribute('title');
   let name = accessibleNames.get(element);
   if (!name) {
-    name = element.ownerDocument.createElement('span');
+    name = element.ownerDocument.defaultView!.createSpan();
     name.id = `codex-name-${crypto.randomUUID()}`;
     name.className = 'codex-sr-only';
     name.hidden = true;
@@ -76,8 +77,8 @@ export class CodexView extends ItemView {
   private rendered = new Map<string, MessageEntry>();
   private renderedTurns = new Map<string, TurnEntry>();
   private unsubscribe?: () => void;
-  private refreshTimer?: ReturnType<typeof setTimeout>;
-  private elapsedTimer?: ReturnType<typeof setInterval>;
+  private refreshTimer?: number;
+  private elapsedTimer?: number;
   private dictation?: Dictation;
   private voiceBar!: HTMLElement;
   private voiceStatus!: HTMLElement;
@@ -184,11 +185,11 @@ export class CodexView extends ItemView {
     this.registerDomEvent(root.ownerDocument, 'pointerdown', event => {if (this.popup && !this.popup.contains(event.target as Node) && !this.popupAnchor?.contains(event.target as Node)) this.closePopup();});
     this.registerDomEvent(root.ownerDocument, 'keydown', event => {if (event.key === 'Escape' && this.popup) {event.preventDefault(); const anchor = this.popupAnchor; this.closePopup(); anchor?.focus();}});
     this.registerDomEvent(root.ownerDocument.defaultView!, 'resize', () => this.closePopup());
-    this.unsubscribe = this.controller.subscribe(() => {if (this.refreshTimer) return; this.refreshTimer = setTimeout(() => {this.refreshTimer = undefined; this.refresh();}, 40);});
+    this.unsubscribe = this.controller.subscribe(() => {if (this.refreshTimer) return; this.refreshTimer = this.contentEl.ownerDocument.defaultView!.setTimeout(() => {this.refreshTimer = undefined; this.refresh();}, 40);});
     this.localizeShell = bindStaticTranslations(root, this.t); this.localizeShell(); this.locale = this.controller.i18n.locale;
     this.refresh();
   }
-  async onClose() {this.unsubscribe?.(); clearTimeout(this.refreshTimer); clearInterval(this.elapsedTimer); this.dictation?.dispose(); this.clearMessages(); this.closePopup();}
+  async onClose() {this.unsubscribe?.(); this.contentEl.ownerDocument.defaultView!.clearTimeout(this.refreshTimer); this.contentEl.ownerDocument.defaultView!.clearInterval(this.elapsedTimer); this.dictation?.dispose(); this.clearMessages(); this.closePopup();}
   private notice(error: unknown) {new Notice(errorText(error));}
   private resizeInput() {this.input.style.removeProperty('height'); this.input.style.height = `${Math.min(220, Math.max(46, this.input.scrollHeight))}px`; this.updateSend();}
   private updateSend() {
@@ -286,7 +287,7 @@ export class CodexView extends ItemView {
     if (options.length) {
       const track = popup.createDiv({cls: 'codex-slider-wrap'});
       const dots = track.createDiv({cls: 'codex-slider-dots'});
-      for (const _option of options) dots.createSpan();
+      for (let index = 0; index < options.length; index++) dots.createSpan();
       const slider = track.createEl('input', {cls: 'codex-effort-slider', type: 'range', attr: {min: '0', max: String(Math.max(0, options.length - 1)), step: '1'}});
       setAccessibleName(slider, this.t('推理强度'));
       track.createSpan({cls: 'codex-slider-thumb', attr: {'aria-hidden': 'true'}});
@@ -411,8 +412,8 @@ export class CodexView extends ItemView {
     for (const [id, entry] of this.renderedTurns) if (!ids.has(id)) {entry.el.remove(); this.renderedTurns.delete(id);}
     for (const turn of turns) this.renderTurn(turn);
     if (turns.some(turn => turn.status === 'inProgress')) {
-      this.elapsedTimer ??= setInterval(() => {for (const entry of this.renderedTurns.values()) if (entry.turn.status === 'inProgress') entry.processLabel.textContent = durationLabel(entry.turn, Date.now(), this.t);}, 1000);
-    } else {clearInterval(this.elapsedTimer); this.elapsedTimer = undefined;}
+      this.elapsedTimer ??= this.contentEl.ownerDocument.defaultView!.setInterval(() => {for (const entry of this.renderedTurns.values()) if (entry.turn.status === 'inProgress') entry.processLabel.textContent = durationLabel(entry.turn, Date.now(), this.t);}, 1000);
+    } else {this.contentEl.ownerDocument.defaultView!.clearInterval(this.elapsedTimer); this.elapsedTimer = undefined;}
     if (shouldAutoScroll(c.data.settings.autoScroll, nearBottom)) this.messageList.scrollTop = this.messageList.scrollHeight;
     this.renderApprovals(); this.updateSend();
   }
@@ -484,7 +485,7 @@ export class CodexView extends ItemView {
         body.addClass('markdown-rendered');
         entry.renderer = new StreamRenderer<{stage: HTMLElement; component: Component}>(async text => {
           const component = new Component(); this.addChild(component);
-          const stage = target.body.ownerDocument.createElement('div');
+          const stage = target.body.ownerDocument.defaultView!.createDiv();
           try {await MarkdownRenderer.render(this.app, text, stage, '', component);}
           catch {stage.textContent = text; stage.addClass('is-plain');}
           return {stage, component};
@@ -524,7 +525,7 @@ export class CodexView extends ItemView {
     for (const input of Array.from(this.approvalEl.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-question-id]'))) if (answers.has(input.dataset.questionId!)) input.value = answers.get(input.dataset.questionId!)!;
   }
   private renderApproval(request: RpcEvent) {
-    const card = this.approvalEl.createDiv({cls: 'codex-approval', attr: {role: 'region'}}); const p = request.params;
+    const card = this.approvalEl.createDiv({cls: 'codex-approval', attr: {role: 'region'}}); const p = eventParams(request.params);
     setAccessibleName(card, this.t('Codex 需要你的回复'));
     const isQuestion = request.method.endsWith('requestUserInput');
     card.createEl('h4', {text: isQuestion ? this.t('Codex 需要你的回复') : this.t('允许这次操作？')});

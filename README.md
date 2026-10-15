@@ -19,7 +19,7 @@ This release supports Obsidian desktop **1.13.7+** and builds against the **1.13
 
 ### Community directory
 
-After this plugin has been published in the Obsidian Community directory, open **Settings → Community plugins → Browse**, search for **Vault Codex**, install it, and enable it. Until then, use a manual installation.
+Open **Settings → Community plugins → Browse**, search for **Vault Codex**, install it, and enable it. You can also open the [community listing](https://community.obsidian.md/plugins/vault-codex).
 
 ### Manual installation
 

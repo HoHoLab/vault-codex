@@ -41,3 +41,10 @@ test('assistant preferences preserve vault instructions and use the native verbo
   for (const responseVerbosity of ['low', 'medium', 'high'] as const) assert.deepEqual(assistantPreferences({...settings, responseVerbosity}).config, {model_verbosity: responseVerbosity});
   assert.deepEqual(assistantPreferences({...settings, customInstructions: '  ', responseVerbosity: 'default'}), {developerInstructions: VAULT_INSTRUCTIONS});
 });
+
+test('assistant instructions protect the actual configured vault directory', () => {
+  const preferences = assistantPreferences(DEFAULT_SETTINGS, '.custom-settings');
+  assert.ok(preferences.developerInstructions.includes('".custom-settings"'));
+  assert.ok(preferences.developerInstructions.includes('unless the user explicitly requests it'));
+  assert.ok(!preferences.developerInstructions.includes('.obsidian'));
+});

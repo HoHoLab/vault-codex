@@ -4,10 +4,13 @@ import {access, readdir} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {homedir} from 'node:os';
 import {join, delimiter} from 'node:path';
+import {setTimeout, clearTimeout} from 'node:timers';
+import {isRecord} from './protocol';
+import {errorText} from './types';
 import {CLIENT_INFO} from './plugin-info';
 
-export interface RpcEvent { method: string; params: any; id?: string | number; }
-interface Pending { resolve: (value: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; }
+export interface RpcEvent { method: string; params: unknown; id?: string | number; }
+interface Pending { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; }
 export class CodexRpc {
   constructor(private readonly t: Translate = defaultTranslate) {}
   private child?: ChildProcessWithoutNullStreams;
@@ -49,14 +52,18 @@ export class CodexRpc {
       while ((newline = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
         if (!line.trim()) continue;
-        let message: any;
+        let message: unknown;
         try { message = JSON.parse(line); } catch { fail(new Error(this.t('Codex 返回了无效的协议消息。'))); child.kill(); return; }
-        if (message.method) this.emit(message);
+        if (!isRecord(message)) { fail(new Error(this.t('Codex 返回了无效的协议消息。'))); child.kill(); return; }
+        if (typeof message.method === 'string') {
+          const id = typeof message.id === 'string' || typeof message.id === 'number' ? message.id : undefined;
+          this.emit({method: message.method, params: message.params, id});
+        }
         else if (typeof message.id === 'number') {
           const request = this.pending.get(message.id);
           if (!request) continue;
           this.pending.delete(message.id); clearTimeout(request.timer);
-          if (message.error) request.reject(new Error(message.error.message ?? this.t('Codex 请求失败')));
+          if (message.error) request.reject(new Error(isRecord(message.error) && typeof message.error.message === 'string' ? message.error.message : this.t('Codex 请求失败')));
           else request.resolve(message.result);
         }
       }
@@ -66,13 +73,13 @@ export class CodexRpc {
       this.notify('initialized', {}); this.ready = true;
     } catch (error) { if (this.child === child) this.close(); throw error; }
   }
-  request<T = any>(method: string, params: unknown, timeout = 60000): Promise<T> {
+  request<T = unknown>(method: string, params: unknown, timeout = 60000): Promise<T> {
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(this.t('{method} 请求超时。请检查连接后重试。', {method}))); }, timeout);
-      this.pending.set(id, {resolve, reject, timer});
+      this.pending.set(id, {resolve: value => resolve(value as T), reject, timer});
       try { this.write({id, method, params}); }
-      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
+      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error instanceof Error ? error : new Error(errorText(error))); }
     });
   }
   notify(method: string, params: unknown) { this.write({method, params}); }

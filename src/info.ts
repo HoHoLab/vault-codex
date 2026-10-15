@@ -7,13 +7,13 @@ import {PLUGIN_NAME} from './plugin-info';
 export class InfoModal extends Modal {
   private get t() {return this.controller.i18n.t;}
   private unsubscribe?: () => void;
-  private timer?: ReturnType<typeof setTimeout>;
+  private timer?: number;
   constructor(app: App, private controller: Controller, private version: string) {super(app);}
   onOpen() {
     this.titleEl.setText(`${PLUGIN_NAME} ${this.t('信息')}`); this.contentEl.addClass('codex-info'); this.draw();
-    this.unsubscribe = this.controller.subscribe(() => {if (!this.timer) this.timer = setTimeout(() => {this.timer = undefined; this.draw();}, 150);});
+    this.unsubscribe = this.controller.subscribe(() => {if (!this.timer) this.timer = this.contentEl.ownerDocument.defaultView!.setTimeout(() => {this.timer = undefined; this.draw();}, 150);});
   }
-  onClose() {this.unsubscribe?.(); clearTimeout(this.timer); this.contentEl.empty();}
+  onClose() {this.unsubscribe?.(); this.contentEl.ownerDocument.defaultView!.clearTimeout(this.timer); this.contentEl.empty();}
   private draw() {
     const c = this.controller; const settings = c.data.settings;
     this.contentEl.empty();

@@ -1,4 +1,5 @@
 import {defaultTranslate, type Translate} from './i18n';
+import {isRecord} from './protocol';
 import {MAX_AUDIO_BYTES} from './transcription';
 
 export type DictationPhase = 'idle' | 'starting' | 'recording' | 'transcribing';
@@ -20,11 +21,11 @@ export class Dictation {
   private context?: AudioContext;
   private meter?: AnalyserNode;
   private samples?: Uint8Array<ArrayBuffer>;
-  private timer?: ReturnType<typeof setInterval>;
+  private timer?: number;
   private cancelRequest?: AbortController;
   private seconds = 0;
   private level = 0;
-  constructor(private browser: Window & typeof globalThis, private callbacks: DictationCallbacks, private readonly t: Translate = defaultTranslate) {}
+  constructor(private browser: Window & Pick<typeof window, 'MediaRecorder' | 'AudioContext' | 'Blob'>, private callbacks: DictationCallbacks, private readonly t: Translate = defaultTranslate) {}
   private changed(phase = this.phase) {this.phase = phase; if (!this.disposed) this.callbacks.state({phase, seconds: this.seconds, level: this.level});}
   async start() {
     if (this.phase !== 'idle' || this.disposed) return;
@@ -57,9 +58,9 @@ export class Dictation {
           return this.callbacks.transcribe(audio, mime, cancellation.signal);
         }).then(text => {
           if (!current()) return; this.cancelRequest = undefined; this.changed('idle'); this.callbacks.text(text);
-        }).catch(error => {
+        }).catch((error: unknown) => {
           if (!current()) return; this.cancelRequest = undefined; this.changed('idle');
-          if (error?.name !== 'AbortError') this.callbacks.error(error instanceof Error ? error.message : this.t('语音转写失败，请重试。'));
+          if (!(isRecord(error) && error.name === 'AbortError')) this.callbacks.error(error instanceof Error ? error.message : this.t('语音转写失败，请重试。'));
         });
       };
       // Audio metering is optional; failure must not prevent recording.
@@ -71,7 +72,7 @@ export class Dictation {
         void this.context.resume().catch(() => {});
       } catch {this.meter = undefined; this.samples = undefined;}
       recorder.start(500); const startedAt = Date.now(); this.changed('recording');
-      this.timer = setInterval(() => {
+      this.timer = this.browser.setInterval(() => {
         if (!current()) return;
         this.seconds = Math.floor((Date.now() - startedAt) / 1000);
         if (this.meter && this.samples) {
@@ -92,11 +93,11 @@ export class Dictation {
   cancel() {
     ++this.generation; this.cancelRequest?.abort(); this.cancelRequest = undefined;
     const recorder = this.recorder; this.recorder = undefined;
-    if (recorder && recorder.state !== 'inactive') {try {recorder.stop();} catch {}}
+    if (recorder && recorder.state !== 'inactive') {try {recorder.stop();} catch {/* The recorder may already be stopped after a device error. */}}
     this.releaseMedia(); this.seconds = 0; this.level = 0; this.changed('idle');
   }
   private releaseMedia() {
-    clearInterval(this.timer); this.timer = undefined;
+    this.browser.clearInterval(this.timer); this.timer = undefined;
     this.stream?.getTracks().forEach(track => track.stop()); this.stream = undefined;
     const context = this.context; this.context = undefined; this.meter = undefined; this.samples = undefined;
     if (context && context.state !== 'closed') void context.close().catch(() => {});

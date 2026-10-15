@@ -12,7 +12,7 @@ function setup(options: {getMedia?: () => Promise<any>; transcribe?: () => Promi
     stop() {this.state = 'inactive'; queueMicrotask(() => {this.ondataavailable?.({data: new Blob(['audio'])}); this.onstop?.();});}
   }
   const states: DictationState[] = []; const text: string[] = []; const errors: string[] = []; let uploads = 0;
-  const browser = {navigator: {mediaDevices: {getUserMedia: options.getMedia ?? (async () => stream)}}, MediaRecorder: Recorder, Blob} as unknown as Window & typeof globalThis;
+  const browser = {setInterval, clearInterval, navigator: {mediaDevices: {getUserMedia: options.getMedia ?? (async () => stream)}}, MediaRecorder: Recorder, Blob} as unknown as Window & typeof globalThis;
   const dictation = new Dictation(browser, {prepare: async () => {}, transcribe: async () => {uploads++; return options.transcribe ? options.transcribe() : '识别结果';}, state: state => states.push(state), text: result => text.push(result), error: error => errors.push(error)});
   return {dictation, stream, states, text, errors, get stops() {return stops;}, get uploads() {return uploads;}};
 }

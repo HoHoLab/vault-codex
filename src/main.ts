@@ -1,4 +1,5 @@
 import {FileSystemAdapter, Notice, Plugin, getLanguage, type Command, type WorkspaceLeaf} from 'obsidian';
+import {isRecord} from './protocol';
 import {Controller} from './controller';
 import {errorText, normalizeSettings, type SavedData, type Settings, type PanelPlacement} from './types';
 import {CodexView, VIEW_TYPE, setAccessibleName} from './view';
@@ -13,12 +14,13 @@ export default class CodexPlugin extends Plugin {
   private localizeCommands: (() => void)[] = [];
   private movingPanel = false;
   async onload() {
-    const saved = await this.loadData();
-    const data: SavedData = {settings: normalizeSettings(saved?.settings), sessions: Array.isArray(saved?.sessions) ? saved.sessions : [], activeId: saved?.activeId};
+    const raw: unknown = await this.loadData();
+    const saved = isRecord(raw) ? raw : {};
+    const data: SavedData = {settings: normalizeSettings(saved?.settings), sessions: Array.isArray(saved?.sessions) ? saved.sessions as SavedData['sessions'] : [], activeId: typeof saved.activeId === 'string' ? saved.activeId : undefined};
     const i18n = new I18n(() => data.settings.language, () => getLanguage());
     const t = i18n.t;
     if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {new Notice(t('Codex 需要桌面版本的本地笔记库。')); return;}
-    this.controller = new Controller(data, this.app.vault.adapter.getBasePath(), () => this.persist(), undefined, i18n);
+    this.controller = new Controller(data, this.app.vault.adapter.getBasePath(), () => this.persist(), undefined, i18n, this.app.vault.configDir);
     this.registerView(VIEW_TYPE, leaf => new CodexView(leaf, this));
     const ribbon = this.addRibbonIcon('bot', t('打开 Vault Codex'), () => {void this.openView();});
     this.localizeCommands.push(() => setAccessibleName(ribbon, t('打开 Vault Codex')));
@@ -39,7 +41,7 @@ export default class CodexPlugin extends Plugin {
     if (data.settings.autoConnect) this.app.workspace.onLayoutReady(() => {void this.controller.connect().catch(error => new Notice(errorText(error)));});
   }
   persist() {
-    const snapshot = JSON.parse(JSON.stringify(this.controller.data));
+    const snapshot: unknown = JSON.parse(JSON.stringify(this.controller.data));
     this.saveQueue = this.saveQueue.catch(() => {}).then(() => this.saveData(snapshot));
     return this.saveQueue;
   }

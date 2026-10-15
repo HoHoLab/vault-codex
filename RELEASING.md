@@ -13,19 +13,19 @@ This guide follows the Obsidian Community directory workflow documented on 2026-
 5. Run `npm run check`, then `npm run package`. A system `zip` command is required. Packaging also validates metadata and assembles only explicitly allowed files.
 6. Before announcing a new version, test installation, connection, a conversation, note references, approvals, stop/reconnect, export, and any changed microphone behavior in a separate desktop test vault. Unit tests do not replace this application check. Only claim the operating systems and versions actually verified.
 
-The current release is **0.1.11** and requires **Obsidian desktop 1.13.7**. It builds against the 1.13.1 public API definitions; the README records the native macOS verification performed on 1.13.7.
+The current release is **0.1.12** and requires **Obsidian desktop 1.13.7**. It builds against the 1.13.1 public API definitions; the README records the native macOS verification performed on 1.13.7.
 
 ## Generated files
 
 ```text
 artifacts/
   release/vault-codex/                 # Clean manual installation folder
-  releases/0.1.11/
+  releases/0.1.12/
     main.js                           # Required GitHub release attachment
     manifest.json                     # Required GitHub release attachment
     styles.css                        # Required for this plugin's styles
-    vault-codex-0.1.11.zip             # Manual installation, includes LICENSE/READMEs
-    vault-codex-0.1.11-source.zip      # Public source with build configuration
+    vault-codex-0.1.12.zip             # Manual installation, includes LICENSE/READMEs
+    vault-codex-0.1.12-source.zip      # Public source with build configuration
     RELEASE_NOTES.md                   # Release description
     SHA256SUMS.txt                     # Checksums of the three attachments and ZIPs
 ```
@@ -40,22 +40,22 @@ Commit the release manifest and notes to the repository's **default branch** bef
 
 ## Create a GitHub release
 
-Choose either method. The tag must exactly match `manifest.json`: **`0.1.11`**, not `v0.1.11`.
+Choose either method. The tag must exactly match `manifest.json`: **`0.1.12`**, not `v0.1.12`.
 
 ### Automatic draft
 
 The included `.github/workflows/release.yml` builds, tests, validates the tag, and creates a **draft** GitHub release when a tag is pushed. After the default-branch commit is on GitHub:
 
 ```sh
-git tag 0.1.11
-git push origin 0.1.11
+git tag 0.1.12
+git push origin 0.1.12
 ```
 
-The workflow attaches the individual plugin files, installation/source ZIPs, and checksum file, and uses `releases/0.1.11.md` for the description. Open the draft, inspect its attachments and description, and publish it. A draft is not downloadable by the Obsidian installer.
+The workflow attaches the individual plugin files, installation/source ZIPs, and checksum file, and uses `releases/0.1.12.md` for the description. Open the draft, inspect its attachments and description, and publish it. A draft is not downloadable by the Obsidian installer.
 
 ### Manual release
 
-On GitHub, open **Releases → Draft a new release**, choose tag **0.1.11**, and use `releases/0.1.11.md` as the description. Upload the contents of `artifacts/releases/0.1.11/`, using `RELEASE_NOTES.md` as the description rather than a required plugin attachment.
+On GitHub, open **Releases → Draft a new release**, choose tag **0.1.12**, and use `releases/0.1.12.md` as the description. Upload the contents of `artifacts/releases/0.1.12/`, using `RELEASE_NOTES.md` as the description rather than a required plugin attachment.
 
 Attach `main.js`, `manifest.json`, and `styles.css` **individually** under those exact filenames. A ZIP-only release cannot be installed by Obsidian. Publish a normal release, not a draft or prerelease.
 
@@ -82,3 +82,5 @@ The old development ID, `codex-for-obsidian`, stores data in a different folder.
 - [Submission requirements](https://docs.obsidian.md/community-directory/submission-requirements-for-plugins)
 - [Developer policies](https://docs.obsidian.md/community-directory/developer-policies)
 - [Set up your community profile and submit](https://docs.obsidian.md/community-directory/set-up-and-claim)
+
+The release workflow attests `main.js`, `manifest.json`, and `styles.css` using GitHub Actions. Before publishing the draft, verify the downloaded assets with `gh attestation verify <asset> --repo HoHoLab/vault-codex` as well as the checksums.
