@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11 — 2026-10-15
+
+- Move the chat input's automatic height and the permission menu's fixed alignment into CSS classes to resolve the community scanner's blocking style rule while preserving dynamic sizing and positioning.
+
 ## 0.1.10 — 2026-10-14
 
 - Add ten interface languages, automatic Obsidian-language selection, and English fallback for missing translations.

@@ -34,7 +34,7 @@
 .codex-composer-actions .codex-icon-button { color: var(--cx-muted); }
 .codex-composer { border: 1px solid color-mix(in srgb, var(--cx-border) 45%, var(--cx-surface)); border-radius: 22px; background: var(--cx-surface); box-shadow: 0 2px 12px rgb(0 0 0 / 1.5%); padding: 14px 8px 8px; }
 .codex-composer:focus-within { border-color: color-mix(in srgb, var(--cx-border) 70%, var(--cx-muted)); }
-.codex-view .codex-input { display: block; width: 100%; min-height: 46px; max-height: 220px; padding: 0 1px 8px; margin: 0; border: none; outline: none; border-radius: 0; resize: none; box-shadow: none !important; background: transparent; font: inherit; font-size: 14px; line-height: 1.6; color: var(--cx-text); }
+.codex-view .codex-input { display: block; width: 100%; height: auto; min-height: 46px; max-height: 220px; padding: 0 1px 8px; margin: 0; border: none; outline: none; border-radius: 0; resize: none; box-shadow: none !important; background: transparent; font: inherit; font-size: 14px; line-height: 1.6; color: var(--cx-text); }
 .codex-view .codex-input::placeholder { color: color-mix(in srgb, var(--cx-muted) 35%, var(--cx-surface)); }
 .codex-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-height: 30px; }
 .codex-toolbar-left { min-width: 0; gap: 8px; }
@@ -94,6 +94,7 @@
 .codex-model-trigger { color: var(--cx-muted); font-size: 12px; display: flex; align-items: center; gap: 2px; }
 .codex-model-trigger svg { width: 12px; height: 12px; vertical-align: middle; }
 .codex-access-popover, .codex-model-popover { width: 300px; padding: 6px; border-radius: 14px; }
+.codex-access-popover { left: 12px; }
 .codex-model-popover { width: 256px; }
 .codex-view .codex-model-popover .codex-choice-row { height: 32px; min-height: 32px; padding: 6px 10px; }
 .codex-model-popover .codex-choice-title { font-weight: 400; white-space: nowrap; }

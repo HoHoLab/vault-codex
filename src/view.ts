@@ -190,7 +190,7 @@ export class CodexView extends ItemView {
   }
   async onClose() {this.unsubscribe?.(); clearTimeout(this.refreshTimer); clearInterval(this.elapsedTimer); this.dictation?.dispose(); this.clearMessages(); this.closePopup();}
   private notice(error: unknown) {new Notice(errorText(error));}
-  private resizeInput() {this.input.style.height = 'auto'; this.input.style.height = `${Math.min(220, Math.max(46, this.input.scrollHeight))}px`; this.updateSend();}
+  private resizeInput() {this.input.style.removeProperty('height'); this.input.style.height = `${Math.min(220, Math.max(46, this.input.scrollHeight))}px`; this.updateSend();}
   private updateSend() {
     const c = this.controller;
     setButtonIcon(this.sendButton, c.busy ? 'square' : 'arrow-up');
@@ -255,8 +255,7 @@ export class CodexView extends ItemView {
     const root = this.contentEl.getBoundingClientRect(); const rect = anchor.getBoundingClientRect();
     popup.style.bottom = `${root.bottom - rect.top + 8}px`;
     popup.style.maxHeight = `${Math.max(100, rect.top - root.top - 16)}px`;
-    if (anchor === this.accessButton) popup.style.left = '12px';
-    else popup.style.right = `${Math.max(12, root.right - rect.right - 44)}px`;
+    if (anchor !== this.accessButton) popup.style.right = `${Math.max(12, root.right - rect.right - 44)}px`;
     return popup;
   }
   private menuKeyboard(element: HTMLElement) {
