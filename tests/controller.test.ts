@@ -20,7 +20,7 @@ function setup() {const rpc = new FakeRpc(); const c = new Controller({settings:
 test('assistant preferences reach new and resumed threads, including changing and clearing an existing chat', async () => {
   class ReconnectRpc extends FakeRpc {
     starts = 0;
-    override async connect() {this.ready = true; this.starts++;}
+    override async connect(command: string) {assert.equal(command, process.execPath); this.ready = true; this.starts++;}
   }
   const rpc = new ReconnectRpc(); let turns = 0;
   rpc.handler = method => {
@@ -29,7 +29,8 @@ test('assistant preferences reach new and resumed threads, including changing an
     if (method === 'thread/start' || method === 'thread/resume') return {thread: {id: 'thread-1'}};
     return {turn: {id: `turn-${++turns}`}};
   };
-  const settings = {...DEFAULT_SETTINGS, customInstructions: 'Use concise Chinese replies.', responseVerbosity: 'low' as const};
+  // Use a known executable for path validation; the fake transport never launches it.
+  const settings = {...DEFAULT_SETTINGS, executable: process.execPath, customInstructions: 'Use concise Chinese replies.', responseVerbosity: 'low' as const};
   const c = new Controller({settings, sessions: []}, '/vault', async () => {}, rpc);
   const complete = () => rpc.push({method: 'turn/completed', params: {threadId: 'thread-1', turn: {id: `turn-${turns}`, status: 'completed'}}});
   try {
