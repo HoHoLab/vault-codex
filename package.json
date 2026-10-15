@@ -1,6 +1,6 @@
 {
   "name": "vault-codex",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "description": "Chat with local Codex, work with notes, and review agent actions in your vault.",
   "author": "hoho",

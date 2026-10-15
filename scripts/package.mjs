@@ -61,6 +61,6 @@ const verifySnapshot = async (directory, relative = '') => {
 await verifySnapshot(source);
 await verifySnapshot(destination);
 await validateRelease();
-console.log(`GitHub release attachments: ${release}`);
+console.log(`GitHub release attachments: ${pluginAssets.map(file => join(release, file)).join(', ')}`);
 console.log(`Installable plugin: ${join(release, installName)}`);
 console.log(`Public source: ${join(release, sourceName)}`);

@@ -19,12 +19,12 @@
 
 ### 社区插件库
 
-在「设置 → 第三方插件 → 浏览」搜索 **Vault Codex** 并安装、启用，也可以直接打开[社区插件页面](https://community.obsidian.md/plugins/vault-codex)。
+[社区插件页面](https://community.obsidian.md/plugins/vault-codex)已发布。应用内目录收录后，可在「设置 → 第三方插件 → 浏览」搜索 **Vault Codex** 并安装、启用。如果仍搜索不到，请按下面的方法手动安装；网页发布成功不代表已经验证应用内可搜索。
 
 ### 手动安装
 
-1. 从本项目的 GitHub Release 下载 `vault-codex-<版本号>.zip`。带 `-source` 的 ZIP 是开发源码，不是可直接安装的成品。
-2. 关闭 Obsidian，把 ZIP 中的 `vault-codex` 文件夹解压到笔记库的插件目录。默认是 `.obsidian/plugins/`；修改过配置目录时，使用你实际的目录。
+1. 从 [GitHub 发布页](https://github.com/HoHoLab/vault-codex/releases)的**同一版本**下载 **`main.js`、`manifest.json`、`styles.css`**。从 0.1.13 起，发布附件只包含这三个文件；GitHub 自动提供的 **Source code** 压缩包是开发源码，不能直接安装。
+2. 关闭 Obsidian，在笔记库的插件目录下创建 `vault-codex` 文件夹，将三个文件放入其中。插件目录默认是 `.obsidian/plugins/`；修改过配置目录时，使用你实际的目录。更新已有安装时，只替换这三个文件，保留 `data.json`。
 3. 确认结构如下：
 
    ```text
@@ -32,11 +32,6 @@
      main.js
      manifest.json
      styles.css
-     LICENSE
-     README.md
-     README.zh-CN.md
-     CHANGELOG.md
-     RELEASING.md
    ```
 
 4. 打开 Obsidian，在「设置 → 第三方插件」启用 **Vault Codex**。

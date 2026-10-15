@@ -44,9 +44,6 @@ jobs:
             "artifacts/releases/$RELEASE_TAG/main.js" \
             "artifacts/releases/$RELEASE_TAG/manifest.json" \
             "artifacts/releases/$RELEASE_TAG/styles.css" \
-            "artifacts/releases/$RELEASE_TAG/vault-codex-$RELEASE_TAG.zip" \
-            "artifacts/releases/$RELEASE_TAG/vault-codex-$RELEASE_TAG-source.zip" \
-            "artifacts/releases/$RELEASE_TAG/SHA256SUMS.txt" \
             --draft --verify-tag \
             --title "Vault Codex $RELEASE_TAG" \
             --notes-file "artifacts/releases/$RELEASE_TAG/RELEASE_NOTES.md"

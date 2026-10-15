@@ -13,24 +13,24 @@ This guide follows the Obsidian Community directory workflow documented on 2026-
 5. Run `npm run check`, then `npm run package`. A system `zip` command is required. Packaging also validates metadata and assembles only explicitly allowed files.
 6. Before announcing a new version, test installation, connection, a conversation, note references, approvals, stop/reconnect, export, and any changed microphone behavior in a separate desktop test vault. Unit tests do not replace this application check. Only claim the operating systems and versions actually verified.
 
-The current release is **0.1.12** and requires **Obsidian desktop 1.13.7**. It builds against the 1.13.1 public API definitions; the README records the native macOS verification performed on 1.13.7.
+The current release is **0.1.13** and requires **Obsidian desktop 1.13.7**. It builds against the 1.13.1 public API definitions; the README records the native macOS verification performed on 1.13.7.
 
 ## Generated files
 
 ```text
 artifacts/
   release/vault-codex/                 # Clean manual installation folder
-  releases/0.1.12/
+  releases/0.1.13/
     main.js                           # Required GitHub release attachment
     manifest.json                     # Required GitHub release attachment
     styles.css                        # Required for this plugin's styles
-    vault-codex-0.1.12.zip             # Manual installation, includes LICENSE/READMEs
-    vault-codex-0.1.12-source.zip      # Public source with build configuration
+    vault-codex-0.1.13.zip             # Manual installation, includes LICENSE/READMEs
+    vault-codex-0.1.13-source.zip      # Public source with build configuration
     RELEASE_NOTES.md                   # Release description
     SHA256SUMS.txt                     # Checksums of the three attachments and ZIPs
 ```
 
-The source archive includes source, tests, build/release scripts, `.github` workflows, documentation, and dependency metadata. It excludes `node_modules`, build output, artifacts, private plugin data, environment files, local vaults, and backups. The installation folder is recreated before packaging so stale files cannot carry over.
+ZIPs and `SHA256SUMS.txt` remain local packaging/verification outputs; they are not attached to releases from 0.1.13 onward. The source archive includes source, tests, build/release scripts, `.github` workflows, documentation, and dependency metadata. It excludes `node_modules`, build output, artifacts, private plugin data, environment files, local vaults, and backups. The installation folder is recreated before packaging so stale files cannot carry over.
 
 ## Publish the GitHub repository
 
@@ -40,22 +40,22 @@ Commit the release manifest and notes to the repository's **default branch** bef
 
 ## Create a GitHub release
 
-Choose either method. The tag must exactly match `manifest.json`: **`0.1.12`**, not `v0.1.12`.
+Choose either method. The tag must exactly match `manifest.json`: **`0.1.13`**, not `v0.1.13`.
 
 ### Automatic draft
 
 The included `.github/workflows/release.yml` builds, tests, validates the tag, and creates a **draft** GitHub release when a tag is pushed. After the default-branch commit is on GitHub:
 
 ```sh
-git tag 0.1.12
-git push origin 0.1.12
+git tag 0.1.13
+git push origin 0.1.13
 ```
 
-The workflow attaches the individual plugin files, installation/source ZIPs, and checksum file, and uses `releases/0.1.12.md` for the description. Open the draft, inspect its attachments and description, and publish it. A draft is not downloadable by the Obsidian installer.
+The workflow attaches only `main.js`, `manifest.json`, and `styles.css`, and uses `releases/0.1.13.md` for the description. Open the draft, inspect its attachments and description, and publish it. A draft is not downloadable by the Obsidian installer.
 
 ### Manual release
 
-On GitHub, open **Releases → Draft a new release**, choose tag **0.1.12**, and use `releases/0.1.12.md` as the description. Upload the contents of `artifacts/releases/0.1.12/`, using `RELEASE_NOTES.md` as the description rather than a required plugin attachment.
+On GitHub, open **Releases → Draft a new release**, choose tag **0.1.13**, and use `releases/0.1.13.md` as the description. Upload only `main.js`, `manifest.json`, and `styles.css` from `artifacts/releases/0.1.13/`, using `RELEASE_NOTES.md` as the description. Do not attach the locally generated ZIPs or `SHA256SUMS.txt`: the directory flags these as unsupported extras. GitHub automatically provides source archives for the tag.
 
 Attach `main.js`, `manifest.json`, and `styles.css` **individually** under those exact filenames. A ZIP-only release cannot be installed by Obsidian. Publish a normal release, not a draft or prerelease.
 
@@ -84,3 +84,12 @@ The old development ID, `codex-for-obsidian`, stores data in a different folder.
 - [Set up your community profile and submit](https://docs.obsidian.md/community-directory/set-up-and-claim)
 
 The release workflow attests `main.js`, `manifest.json`, and `styles.css` using GitHub Actions. Before publishing the draft, verify the downloaded assets with `gh attestation verify <asset> --repo HoHoLab/vault-codex` as well as the checksums.
+
+## Remaining behavior review findings
+
+The 0.1.12 review reported Direct Filesystem Access and Shell Execution warnings, plus Vault Enumeration and Clipboard Access recommendations. These describe retained functionality, not failing build or style checks:
+
+- `src/rpc.ts` checks executable permissions and lists the NVM installation directory to discover Codex. It launches the configured executable using `spawn` with separate arguments and `shell: false`; the scanner still classifies use of `child_process` as Shell Execution.
+- `src/view.ts` enumerates eligible vault files for the note/image picker and writes the selected response to the clipboard after the user clicks Copy. It does not read clipboard contents.
+
+Do not claim an all-Pass review while these findings remain. Hiding these calls through indirection or scanner-excluded files would not remove the underlying behavior. Removing them would change executable discovery, local Codex connection, file selection, or Copy reply. Record the actual review after each release.

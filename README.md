@@ -19,12 +19,12 @@ This release supports Obsidian desktop **1.13.7+** and builds against the **1.13
 
 ### Community directory
 
-Open **Settings → Community plugins → Browse**, search for **Vault Codex**, install it, and enable it. You can also open the [community listing](https://community.obsidian.md/plugins/vault-codex).
+The [community listing](https://community.obsidian.md/plugins/vault-codex) is published. Once it appears in your in-app directory, open **Settings → Community plugins → Browse**, search for **Vault Codex**, install it, and enable it. If it is not yet searchable, use the manual installation steps below; publishing the website listing does not by itself verify in-app search availability.
 
 ### Manual installation
 
-1. Download the `vault-codex-<version>.zip` installation asset from a GitHub release of this repository. The `-source.zip` asset contains development source, not an installable build.
-2. Close Obsidian and extract the `vault-codex` folder into your vault's plugin directory. By default, this is `.obsidian/plugins/`; use your configured directory if you changed Obsidian's configuration folder.
+1. Download **`main.js`, `manifest.json`, and `styles.css` from the same release** on the [GitHub releases page](https://github.com/HoHoLab/vault-codex/releases). Starting with 0.1.13, these are the only attached release files. GitHub's automatic **Source code** archives are development source, not an installable build.
+2. Close Obsidian, create a `vault-codex` folder in your vault's plugin directory, and place the three files inside. By default, the plugin directory is `.obsidian/plugins/`; use your configured directory if you changed Obsidian's configuration folder. When updating, replace only these three files and preserve `data.json`.
 3. Check the resulting structure:
 
    ```text
@@ -32,11 +32,6 @@ Open **Settings → Community plugins → Browse**, search for **Vault Codex**, 
      main.js
      manifest.json
      styles.css
-     LICENSE
-     README.md
-     README.zh-CN.md
-     CHANGELOG.md
-     RELEASING.md
    ```
 
 4. Open Obsidian and enable **Vault Codex** in **Settings → Community plugins**.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.13 — 2026-10-15
+
+- Attach only `main.js`, `manifest.json`, and `styles.css` to GitHub releases to address the community review's unsupported-extra-files recommendation; retain ZIPs and checksums as local packaging outputs.
+- Update English and Chinese manual installation instructions for the three-file release and clarify that website publication alone does not verify in-app search availability.
+- Document the remaining behavior findings and their connection to existing features. Plugin runtime source and styles are unchanged.
+
 ## 0.1.12 — 2026-10-15
 
 - Type the consumed Codex protocol fields, account responses, saved-data boundary, and transcription claims; handle invalid JSON message envelopes without leaving requests pending.
