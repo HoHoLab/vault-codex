@@ -1,0 +1,17 @@
+node_modules/
+main.js
+artifacts/
+.DS_Store
+*.log
+
+output/
+.playwright-cli/
+
+# Local vault state and credentials never belong in the public repository.
+.obsidian/
+data.json
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo

@@ -1,0 +1,43 @@
+name: Prepare draft release
+
+on:
+  push:
+    tags: ['*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm run check:release -- --tag "$RELEASE_TAG"
+      - name: Create draft with plugin attachments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "artifacts/releases/$RELEASE_TAG/main.js" \
+            "artifacts/releases/$RELEASE_TAG/manifest.json" \
+            "artifacts/releases/$RELEASE_TAG/styles.css" \
+            "artifacts/releases/$RELEASE_TAG/vault-codex-$RELEASE_TAG.zip" \
+            "artifacts/releases/$RELEASE_TAG/vault-codex-$RELEASE_TAG-source.zip" \
+            "artifacts/releases/$RELEASE_TAG/SHA256SUMS.txt" \
+            --draft --verify-tag \
+            --title "Vault Codex $RELEASE_TAG" \
+            --notes-file "artifacts/releases/$RELEASE_TAG/RELEASE_NOTES.md"

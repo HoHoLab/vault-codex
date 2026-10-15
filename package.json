@@ -1,0 +1,32 @@
+{
+  "name": "vault-codex",
+  "version": "0.1.10",
+  "private": true,
+  "description": "Chat with local Codex, work with notes, and review agent actions in your vault.",
+  "author": "hoho",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs --watch",
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "check:release": "node scripts/check-release.mjs",
+    "check": "npm run build && npm test && npm run check:release",
+    "package": "npm run build && node scripts/package.mjs",
+    "version": "node scripts/version-bump.mjs"
+  },
+  "overrides": {
+    "obsidian": {
+      "moment": "2.31.0"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "0.28.2",
+    "happy-dom": "^21.0.1",
+    "obsidian": "1.13.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}
