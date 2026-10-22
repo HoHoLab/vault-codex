@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.14 — 2026-10-22
+
+- Select reasoning effort by clicking its dot, with a smooth transition between levels. Clicking empty track space or dragging no longer changes the selection; keyboard controls and reset remain available.
+- Animate particles at every reasoning level when Fast is enabled, and blend blue-purple light with particles for Ultra even when Fast is off.
+- Smooth the selector opening, label updates, and effect transitions without recreating the popup when toggling Fast.
+- Remove the outer blue focus outline from the effort track and reveal selectable dots on hover or focus.
+- Respect reduced motion, pause rendering in hidden documents, and dispose animation frames and listeners when the selector closes.
+- Add regression coverage for dot clicks, ignored drags, cancellation, scaled hit targets, keyboard transitions, particle states, and cleanup.
+
 ## 0.1.13 — 2026-10-15
 
 - Attach only `main.js`, `manifest.json`, and `styles.css` to GitHub releases to address the community review's unsupported-extra-files recommendation; retain ZIPs and checksums as local packaging outputs.

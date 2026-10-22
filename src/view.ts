@@ -12,6 +12,7 @@ import {CodexTranscriber} from './transcription';
 import {Dictation, appendTranscript, type DictationState} from './dictation';
 import {answerText, conversationTurns, durationLabel, type ConversationTurn} from './conversation';
 import {StreamRenderer} from './stream-renderer';
+import {EffortSlider} from './effort-slider';
 import {Platform} from 'obsidian';
 import {shouldSend, shouldAutoScroll} from './preferences';
 
@@ -73,6 +74,7 @@ export class CodexView extends ItemView {
   private welcome!: HTMLElement;
   private popup?: HTMLElement;
   private popupAnchor?: HTMLButtonElement;
+  private effortSlider?: EffortSlider;
   private attachments: Attachment[] = [];
   private rendered = new Map<string, MessageEntry>();
   private renderedTurns = new Map<string, TurnEntry>();
@@ -246,7 +248,7 @@ export class CodexView extends ItemView {
     (popup.querySelector('[aria-checked="true"]') as HTMLElement ?? popup.querySelector('button'))?.focus();
   }
   private toggleEffort() {if (this.popupAnchor === this.effortButton) {this.closePopup(); return;} this.drawEffort(true);}
-  private closePopup() {this.popup?.remove(); this.popup = undefined; this.popupAnchor?.setAttribute('aria-expanded', 'false'); this.popupAnchor = undefined;}
+  private closePopup() {this.effortSlider?.destroy(); this.effortSlider = undefined; this.popup?.remove(); this.popup = undefined; this.popupAnchor?.setAttribute('aria-expanded', 'false'); this.popupAnchor = undefined;}
   private createPopup(anchor: HTMLButtonElement, label: string, cls = '') {
     this.closePopup();
     const labelId = `codex-popup-${crypto.randomUUID()}`;
@@ -271,37 +273,51 @@ export class CodexView extends ItemView {
   }
   private modelName(name: string) {return name.replace(/^(GPT-\d+(?:\.\d+)?)-/i, '$1 ');}
   private drawEffort(focus = false) {
-    const popup = this.createPopup(this.effortButton, this.t('模型与推理强度'));
+    const popup = this.createPopup(this.effortButton, this.t('模型与推理强度'), 'codex-effort-selector');
     const top = popup.createDiv({cls: 'codex-effort-top'});
     const c = this.controller;
-    const fast = iconButton(top, 'zap', c.fastEnabled ? this.t('关闭 Fast') : this.t('开启 Fast'), () => {c.toggleFast(); this.drawEffort(); this.popup?.querySelector<HTMLButtonElement>('.codex-fast-toggle')?.focus();}, 'codex-effort-bolt codex-fast-toggle');
+    const fast = iconButton(top, 'zap', c.fastEnabled ? this.t('关闭 Fast') : this.t('开启 Fast'), () => {
+      c.toggleFast(); fast.setAttribute('aria-pressed', String(c.fastEnabled)); fast.toggleClass('is-on', c.fastEnabled);
+      popup.toggleClass('is-fast', c.fastEnabled);
+      this.effortSlider?.setFast(c.fastEnabled);
+      setAccessibleName(fast, c.fastEnabled ? this.t('关闭 Fast') : this.t('开启 Fast'));
+    }, 'codex-effort-bolt codex-fast-toggle');
     fast.disabled = !fastTier(c.model) || c.busy;
     fast.setAttribute('aria-pressed', String(c.fastEnabled)); fast.toggleClass('is-on', c.fastEnabled);
+    popup.toggleClass('is-fast', c.fastEnabled);
     const center = top.createEl('button', {cls: 'codex-effort-summary', attr: {type: 'button', 'aria-haspopup': 'menu'}});
     setAccessibleName(center, this.t('选择模型'));
     const effortLabel = center.createDiv({cls: 'codex-effort-value', text: this.t(EFFORT_LABELS[c.data.settings.effort] ?? '默认')});
     const modelLabel = center.createSpan({cls: 'codex-model-trigger'}); modelLabel.createSpan({text: this.modelName(c.model?.displayName ?? this.t('连接后选择模型'))}); setIcon(modelLabel.createSpan(), 'chevron-right');
     center.disabled = !c.models.length || c.busy; center.onclick = () => this.drawModels();
-    iconButton(top, 'rotate-ccw', this.t('恢复模型默认强度'), () => {if (c.model) {c.data.settings.effort = c.model.defaultReasoningEffort; c.changed(true); this.drawEffort(true);}});
+    let resetEffort = () => {};
+    const reset = iconButton(top, 'rotate-ccw', this.t('恢复模型默认强度'), () => resetEffort());
     const options = c.model?.supportedReasoningEfforts ?? [];
+    reset.disabled = c.busy || !options.length;
     if (options.length) {
       const track = popup.createDiv({cls: 'codex-slider-wrap'});
-      const dots = track.createDiv({cls: 'codex-slider-dots'});
-      for (let index = 0; index < options.length; index++) dots.createSpan();
-      const slider = track.createEl('input', {cls: 'codex-effort-slider', type: 'range', attr: {min: '0', max: String(Math.max(0, options.length - 1)), step: '1'}});
-      setAccessibleName(slider, this.t('推理强度'));
-      track.createSpan({cls: 'codex-slider-thumb', attr: {'aria-hidden': 'true'}});
-      const update = () => {
-        const option = options[Number(slider.value)]; c.data.settings.effort = option.reasoningEffort;
-        const label = this.t(EFFORT_LABELS[option.reasoningEffort] ?? option.reasoningEffort);
-        effortLabel.textContent = label; popup.toggleClass('is-ultra', option.reasoningEffort === 'ultra');
-        slider.setAttribute('aria-valuetext', label);
-        const position = options.length === 1 ? 1 : Number(slider.value) / (options.length - 1);
-        track.style.setProperty('--effort-position', String(position)); track.style.setProperty('--effort-progress', `${position * 100}%`);
+      const labels = options.map(option => this.t(EFFORT_LABELS[option.reasoningEffort] ?? option.reasoningEffort));
+      const initial = Math.max(0, options.findIndex(option => option.reasoningEffort === c.data.settings.effort));
+      let labelAnimation: Animation | undefined;
+      const update = (index: number, animate = false) => {
+        c.data.settings.effort = options[index].reasoningEffort;
+        effortLabel.textContent = labels[index]; popup.toggleClass('is-ultra', options[index].reasoningEffort === 'ultra');
+        if (animate && effortLabel.animate && !popup.ownerDocument.defaultView!.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          labelAnimation?.cancel();
+          labelAnimation = effortLabel.animate([{opacity: .35, transform: 'translateY(2px)'}, {opacity: 1, transform: 'translateY(0)'}], {duration: 150, easing: 'cubic-bezier(.2,.8,.2,1)'});
+        }
       };
-      slider.value = String(Math.max(0, options.findIndex(option => option.reasoningEffort === c.data.settings.effort))); slider.disabled = c.busy || options.length === 1; update();
-      slider.oninput = () => {update(); c.changed(true);};
-      if (focus) slider.focus();
+      update(initial);
+      const control = this.effortSlider = new EffortSlider(track, {
+        labels, index: initial, ultraIndex: options.findIndex(option => option.reasoningEffort === 'ultra'), fast: c.fastEnabled, disabled: c.busy,
+        onChange: index => {if (!c.busy) {update(index, true); c.changed(true);}},
+      });
+      setAccessibleName(control.input, this.t('推理强度'));
+      resetEffort = () => {
+        if (c.busy) return;
+        control.select(Math.max(0, options.findIndex(option => option.reasoningEffort === c.model?.defaultReasoningEffort))); control.input.focus();
+      };
+      if (focus) control.input.focus();
     } else popup.createDiv({cls: 'codex-popover-hint', text: this.t('连接 Codex 后加载可用模型与强度。')});
   }
   private drawModels() {
